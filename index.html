@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* Estilos se mantienen igual que en tu versión original */
         :root {
             --color-primary: #2c3e50;
             --color-secondary: #3498db;
@@ -243,14 +244,6 @@
             }
         }
         
-        .total-row {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-            font-weight: 500;
-            color: var(--color-primary);
-        }
-        
         .success-message {
             color: var(--color-success);
             font-weight: 500;
@@ -302,27 +295,35 @@
                     <span class="result-value" id="razonSocial">-</span>
                 </div>
                 <div class="result-item">
-                    <span class="result-label">Trabajadores Hombres:</span>
-                    <span class="result-value" id="hombres">0</span>
+                    <span class="result-label">Provincia:</span>
+                    <span class="result-value" id="provincia">-</span>
                 </div>
                 <div class="result-item">
-                    <span class="result-label">Trabajadores Mujeres:</span>
-                    <span class="result-value" id="mujeres">0</span>
+                    <span class="result-label">Distrito:</span>
+                    <span class="result-value" id="distrito">-</span>
                 </div>
                 <div class="result-item">
-                    <span class="result-label">No especificado:</span>
-                    <span class="result-value" id="noEspecificado">0</span>
+                    <span class="result-label">CIIU:</span>
+                    <span class="result-value" id="ciiu">-</span>
                 </div>
-                <div class="result-item total-row">
-                    <span class="result-label">Total Trabajadores:</span>
-                    <span class="result-value" id="total">0</span>
+                <div class="result-item">
+                    <span class="result-label">Estado:</span>
+                    <span class="result-value" id="estado">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Actividad principal:</span>
+                    <span class="result-value" id="actividad">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Fecha actualizada:</span>
+                    <span class="result-value" id="fecha">-</span>
                 </div>
             </div>
         </div>
         
         <footer>
             <p>© Sistema de Consulta de Empresas</p>
-            <p>Ministerio de Trabajo y Promoción del Empleo</p>
+            <p>Direccion Regional de Trabajo y Promoción del Empleo</p>
         </footer>
     </div>
 
@@ -341,7 +342,14 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    // Opciones para el procesamiento de fechas
+                    const opciones = {
+                        raw: false, // Para obtener valores formateados
+                        dateNF: 'dd/mm/yyyy' // Formato de fecha deseado
+                    };
+                    
+                    jsonData = XLSX.utils.sheet_to_json(firstSheet, opciones);
                     
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('searchSection').style.display = 'block';
@@ -361,7 +369,11 @@
                     `;
                     uploader.classList.add('compact');
                     
+                    // Mostrar los primeros registros en consola para verificar
+                    console.log("Primeros 3 registros cargados:", jsonData.slice(0, 3));
+                    
                 } catch (error) {
+                    console.error("Error al procesar el archivo:", error);
                     document.getElementById('loading').style.display = 'none';
                     const uploader = document.getElementById('fileUploadArea');
                     uploader.innerHTML = `
@@ -389,31 +401,48 @@
                 return;
             }
 
-            const empresa = jsonData.find(row => row.C_NUMRUC == ruc);
+            // Buscar el RUC exacto (convertimos a string para asegurar la comparación)
+            const empresa = jsonData.find(row => String(row.C_NUMRUC) === ruc);
             const resultadoDiv = document.getElementById('resultado');
 
             if (empresa) {
-                const total = (parseInt(empresa.Masculino) || 0) + (parseInt(empresa.femenino) || 0) + (parseInt(empresa.No_especificado) || 0);
+                console.log("Empresa encontrada:", empresa);
+                
+                // Función para formatear fechas de Excel
+                const formatExcelDate = (excelDate) => {
+                    if (!excelDate) return "No especificada";
+                    if (typeof excelDate === 'string') return excelDate;
+                    
+                    // Si es un número (fecha serial de Excel)
+                    const date = new Date((excelDate - (25567 + 1)) * 86400 * 1000);
+                    return date.toLocaleDateString('es-PE');
+                };
                 
                 document.getElementById('razonSocial').textContent = empresa.V_RAZON_SOCIAL || "No registrado";
-                document.getElementById('hombres').textContent = empresa.Masculino || 0;
-                document.getElementById('mujeres').textContent = empresa.femenino || 0;
-                document.getElementById('noEspecificado').textContent = empresa.No_especificado || 0;
-                document.getElementById('total').textContent = total;
+                document.getElementById('provincia').textContent = empresa.Provincia || "No registrado";
+                document.getElementById('distrito').textContent = empresa.Distrito || "No registrado";
+                document.getElementById('ciiu').textContent = empresa.CIIU || "No registrado";
+                
+                // Corregido: El campo ESTADO tiene un espacio al final en el Excel
+                document.getElementById('estado').textContent = empresa["ESTADO "] || empresa.ESTADO || "No especificado";
+                
+                document.getElementById('actividad').textContent = empresa["ACTIVIDAD PRINCIPAL"] || "No especificada";
+                document.getElementById('fecha').textContent = formatExcelDate(empresa["FECHA ACTUALIZADA"]) || "No especificada";
                 
                 document.getElementById('resultTitle').textContent = `Resultados para RUC: ${ruc}`;
                 resultadoDiv.style.display = 'block';
             } else {
+                console.log("Empresa no encontrada para RUC:", ruc);
                 document.getElementById('resultTitle').textContent = "Empresa no encontrada";
                 document.getElementById('razonSocial').textContent = "No se encontraron registros para el RUC proporcionado";
-                document.getElementById('hombres').textContent = "-";
-                document.getElementById('mujeres').textContent = "-";
-                document.getElementById('noEspecificado').textContent = "-";
-                document.getElementById('total').textContent = "-";
+                document.getElementById('provincia').textContent = "-";
+                document.getElementById('distrito').textContent = "-";
+                document.getElementById('ciiu').textContent = "-";
+                document.getElementById('estado').textContent = "-";
+                document.getElementById('actividad').textContent = "-";
+                document.getElementById('fecha').textContent = "-";
                 resultadoDiv.style.display = 'block';
             }
         }
-
     </script>
 </body>
-</html>
